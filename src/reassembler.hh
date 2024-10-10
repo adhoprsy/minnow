@@ -2,6 +2,33 @@
 
 #include "byte_stream.hh"
 
+#include <cstdint>
+#include <map>
+#include <optional>
+#include <sys/types.h>
+
+struct Reassembler_Buffer
+{
+  std::map<uint64_t, std::string> inner_ {};
+
+  auto split( uint64_t pos )
+  {
+    auto it = inner_.lower_bound( pos );
+    if ( ( it != inner_.end() && it->first == pos ) || it == inner_.begin() /* empty */ )
+      return it;
+
+    auto pre { prev( it ) };
+    if ( pre->first + pre->second.size() > pos ) {
+      auto res = inner_.emplace_hint( it, pos, pre->second.substr( pos - pre->first ) );
+      pre->second.resize( pos - pre->first );
+      return res;
+    }
+    return it;
+  }
+
+  bool empty() { return inner_.empty(); }
+};
+
 class Reassembler
 {
 public:
@@ -42,4 +69,9 @@ public:
 
 private:
   ByteStream output_; // the Reassembler writes to this ByteStream
+  uint64_t pending_ {};
+  uint64_t nextIndex { 0 };
+  std::optional<uint64_t> maxBuffered_ {};
+
+  Reassembler_Buffer buffer_ {};
 };
