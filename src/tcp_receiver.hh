@@ -4,6 +4,9 @@
 #include "tcp_receiver_message.hh"
 #include "tcp_sender_message.hh"
 
+#include <cstdint>
+#include <optional>
+
 class TCPReceiver
 {
 public:
@@ -12,7 +15,7 @@ public:
 
   /*
    * The TCPReceiver receives TCPSenderMessages, inserting their payload into the Reassembler
-   * at the correct stream index.
+   *at the correct stream index.
    */
   void receive( TCPSenderMessage message );
 
@@ -27,4 +30,5 @@ public:
 
 private:
   Reassembler reassembler_;
+  std::optional<Wrap32> isn_ {};
 };
