@@ -49,14 +49,16 @@ void TCPSender::push( const TransmitFunction& transmit )
       state_ = AFTER_FIN;
     }
 
-    if (msg.sequence_length() == 0) break;
-    
+    if ( msg.sequence_length() == 0 )
+      break;
+
     next_abs_seqno_ += msg.sequence_length();
     numbers_in_flight_ += msg.sequence_length();
 
     transmit( msg );
     outstanding_.emplace_back( std::move( msg ) );
-    if (!timer_.is_alive()) timer_.start();
+    if ( !timer_.is_alive() )
+      timer_.start();
   }
 }
 

@@ -1,10 +1,30 @@
 #pragma once
 
+#include <asm-generic/errno-base.h>
+#include <cstdint>
 #include <queue>
 
+#include <unordered_map>
+
 #include "address.hh"
+#include "arp_message.hh"
 #include "ethernet_frame.hh"
+#include "ethernet_header.hh"
 #include "ipv4_datagram.hh"
+#include "parser.hh"
+
+struct Timer
+{
+  Timer& tick( uint64_t ms_since_last_tick )
+  {
+    time_ += ms_since_last_tick;
+    return *this;
+  }
+  bool is_expired( uint64_t TO ) { return time_ >= TO; }
+
+private:
+  uint64_t time_ {};
+};
 
 // A "network interface" that connects IP (the internet layer, or network layer)
 // with Ethernet (the network access layer, or link layer).
@@ -81,4 +101,28 @@ private:
 
   // Datagrams that have been received
   std::queue<InternetDatagram> datagrams_received_ {};
+
+  using IPAddrNumeric = uint32_t;
+  const uint64_t ARP_RETRANS_TO = 5000;
+  std::unordered_map<IPAddrNumeric, Timer> wait_retrans_timeout_ {};
+  std::unordered_map<IPAddrNumeric, std::vector<InternetDatagram>> wait_to_send_ {};
+
+  struct ARP_Entry
+  {
+    EthernetAddress ethaddr {};
+    Timer ttl {};
+  };
+  const uint64_t ARP_ENRTY_TTL = 30000;
+  std::unordered_map<IPAddrNumeric, ARP_Entry> arp_cache_ {};
+
+  ARPMessage build_arp( const uint16_t op, const EthernetAddress& ethaddr, const IPAddrNumeric ipaddr )
+  {
+    ARPMessage msg {};
+    msg.opcode = op;
+    msg.sender_ethernet_address = this->ethernet_address_;
+    msg.sender_ip_address = this->ip_address_.ipv4_numeric();
+    msg.target_ethernet_address = ethaddr;
+    msg.target_ip_address = ipaddr;
+    return msg;
+  }
 };
