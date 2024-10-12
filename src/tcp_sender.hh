@@ -10,13 +10,49 @@
 #include <memory>
 #include <optional>
 #include <queue>
+#include <sys/types.h>
+
+struct Timer
+{
+  explicit Timer( uint64_t TO ) : RTO_( TO ) {}
+
+  bool is_alive() { return alive_; }
+  bool is_expired() { return time_ >= RTO_; }
+  void start()
+  {
+    alive_ = true;
+    reset();
+  }
+  void stop()
+  {
+    alive_ = false;
+    reset();
+  }
+  void set( uint64_t new_TO )
+  {
+    RTO_ = new_TO;
+    reset();
+  }
+  void reset() { time_ = 0; }
+  void exp_backoff() { RTO_ <<= 1; }
+  Timer& tick( uint64_t time_passed )
+  {
+    time_ += time_passed;
+    return *this;
+  }
+
+private:
+  bool alive_ {};
+  uint64_t RTO_;
+  uint64_t time_ {};
+};
 
 class TCPSender
 {
 public:
   /* Construct TCP sender with given default Retransmission Timeout and possible ISN */
   TCPSender( ByteStream&& input, Wrap32 isn, uint64_t initial_RTO_ms )
-    : input_( std::move( input ) ), isn_( isn ), initial_RTO_ms_( initial_RTO_ms )
+    : input_( std::move( input ) ), isn_( isn ), initial_RTO_ms_( initial_RTO_ms ), timer_( initial_RTO_ms )
   {}
 
   /* Generate an empty TCPSenderMessage */
@@ -48,4 +84,21 @@ private:
   ByteStream input_;
   Wrap32 isn_;
   uint64_t initial_RTO_ms_;
+
+  Timer timer_;
+  uint64_t numbers_in_flight_ {};
+  uint64_t consec_retransmission_ {};
+
+  std::deque<TCPSenderMessage> outstanding_ {};
+  uint64_t window_size_ { 1 };
+  uint64_t next_abs_seqno_ {};
+  uint64_t acked_abs_seqno_ {}; // syn is [0], so init with 0 is ok
+
+  enum STATE
+  {
+    BEFORE_SYN,
+    BETWEEN_SYN_FIN,
+    AFTER_FIN,
+  };
+  STATE state_ { BEFORE_SYN };
 };
