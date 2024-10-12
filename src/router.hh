@@ -4,6 +4,7 @@
 #include <optional>
 
 #include "exception.hh"
+#include "ipv4_datagram.hh"
 #include "network_interface.hh"
 
 // \brief A router that has multiple network interfaces and
@@ -35,4 +36,29 @@ public:
 private:
   // The router's collection of network interfaces
   std::vector<std::shared_ptr<NetworkInterface>> _interfaces {};
+
+  struct RouterTableEntry
+  {
+    const uint32_t route_prefix;
+    const uint8_t prefix_length;
+    const std::optional<Address> next_hop;
+    const size_t interface_idx;
+  };
+  std::vector<RouterTableEntry> _vector_router_table {};
+
+  std::optional<Router::RouterTableEntry> plain_match( const InternetDatagram& );
+
+
+  struct TrieNode {
+    std::unordered_map<uint8_t, size_t> edge;
+    std::optional<RouterTableEntry> entry;
+  };
+  struct TrieRouterTable {
+    std::vector<TrieNode> nodes_{{{},std::nullopt}};
+    size_t root{0};
+
+    void insert(RouterTableEntry);
+    std::optional<RouterTableEntry> query(const InternetDatagram&);
+  };
+  TrieRouterTable _trie_router_table{};
 };
